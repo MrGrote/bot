@@ -42,7 +42,7 @@ RE_CODE_BLOCK = re.compile(
 )
 
 PY_LANG_CODES = ("python", "py")
-EXAMPLE_PY = f"python\nprint('Hello, world!')"  # Make sure to escape any Markdown symbols here.
+EXAMPLE_PY = "{lang}\nprint('Hello, world!')"  # Make sure to escape any Markdown symbols here.
 EXAMPLE_CODE_BLOCKS = (
     "\\`\\`\\`{content}\n\\`\\`\\`\n\n"
     "**This will result in the following:**\n"
@@ -105,7 +105,7 @@ class CodeFormatting(Cog):
         else:
             # Determine the example code to put in the code block based on the language specifier.
             if code_block.language.lower() in PY_LANG_CODES:
-                content = EXAMPLE_PY
+                content = EXAMPLE_PY.format(lang=code_block.language)
             elif code_block.language:
                 # It's not feasible to determine what would be a valid example for other languages.
                 content = f"{code_block.language}\n..."
@@ -121,7 +121,7 @@ class CodeFormatting(Cog):
     def get_no_ticks_message(cls, content: str) -> Optional[str]:
         """If `content` is Python/REPL code, return instructions on using code blocks."""
         if cls.is_repl_code(content) or cls.is_python_code(content):
-            example_blocks = EXAMPLE_CODE_BLOCKS.format(content=EXAMPLE_PY)
+            example_blocks = EXAMPLE_CODE_BLOCKS.format(content=EXAMPLE_PY.format(lang="python"))
             return (
                 "It looks like you're trying to paste code into this channel.\n\n"
                 "Discord has support for Markdown, which allows you to post code with full "
@@ -153,7 +153,7 @@ class CodeFormatting(Cog):
                     f"There must not be any spaces after `{lang}`."
                 )
 
-            example_blocks = EXAMPLE_CODE_BLOCKS.format(content=EXAMPLE_PY)
+            example_blocks = EXAMPLE_CODE_BLOCKS.format(content=EXAMPLE_PY.format(lang=lang))
             lines.append(f"\n**Here is an example of how it should look:**\n{example_blocks}")
 
             return "\n".join(lines)
@@ -166,7 +166,7 @@ class CodeFormatting(Cog):
         If `content` is not valid Python or Python REPL code, return None.
         """
         if cls.is_repl_code(content) or cls.is_python_code(content):
-            example_blocks = EXAMPLE_CODE_BLOCKS.format(content=EXAMPLE_PY)
+            example_blocks = EXAMPLE_CODE_BLOCKS.format(content=EXAMPLE_PY.format(lang="python"))
 
             # Note that get_bad_ticks_message expects the first line to have an extra newline.
             return (
