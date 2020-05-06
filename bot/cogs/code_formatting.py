@@ -292,12 +292,7 @@ class CodeFormatting(Cog):
 
     @Cog.listener()
     async def on_message(self, msg: Message) -> None:
-        """
-        Detect poorly formatted Python code in new messages.
-
-        If poorly formatted code is detected, send the user a helpful message explaining how to do
-        properly formatted Python syntax highlighting codeblocks.
-        """
+        """Detect incorrect Markdown code blocks in `msg` and send instructions to fix them."""
         if not self.should_parse(msg):
             return
 
@@ -305,17 +300,25 @@ class CodeFormatting(Cog):
         if self.is_on_cooldown(msg.channel) and not DEBUG_MODE:
             return
 
-        try:
-            if self.has_bad_ticks(msg):
-                description = self.format_bad_ticks_message(msg)
+        blocks = self.find_code_blocks(msg.content)
+        if not blocks:
+            # No code blocks found in the message.
+            description = self.get_no_ticks_message(msg.content)
+        else:
+            # Get the first code block with invalid ticks.
+            block = next((block for block in blocks if block.tick != BACKTICK), None)
+
+            if block:
+                # A code block exists but has invalid ticks.
+                description = self.get_bad_ticks_message(block)
             else:
-                description = self.format_guide_message(msg)
-        except SyntaxError:
-            log.trace(
-                f"SyntaxError while parsing code block sent by {msg.author}; "
-                f"code posted probably just wasn't Python:\n\n{msg.content}\n\n"
-            )
-            return
+                # Only other possibility is a block with valid ticks but a missing language.
+                block = blocks[0]
+
+                # Check for a bad language first to avoid parsing content into an AST.
+                description = self.get_bad_lang_message(block.content)
+                if not description:
+                    description = self.get_no_lang_message(block.content)
 
         if description:
             await self.send_guide_embed(msg, description)
