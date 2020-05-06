@@ -30,13 +30,13 @@ TICKS = {
 }
 RE_CODE_BLOCK = re.compile(
     fr"""
-    (
-        ([{''.join(TICKS)}])  # Put all ticks into a character class within a group.
-        \2{{2}}               # Match the previous group 2 more times to ensure it's the same char.
+    (?P<ticks>
+        (?P<tick>[{''.join(TICKS)}])  # Put all ticks into a character class within a group.
+        \2{{2}}                       # Match previous group 2 more times to ensure the same char.
     )
-    ([^\W_]+\n)?              # Optionally match a language specifier followed by a newline.
-    (.+?)                     # Match the actual code within the block.
-    \1                        # Match the same 3 ticks used at the start of the block.
+    (?P<lang>[^\W_]+\n)?              # Optionally match a language specifier followed by a newline.
+    (?P<code>.+?)                     # Match the actual code within the block.
+    \1                                # Match the same 3 ticks used at the start of the block.
     """,
     re.DOTALL | re.VERBOSE
 )
@@ -188,13 +188,18 @@ class CodeFormatting(Cog):
         one code block right, they already know how to fix the rest themselves.
         """
         code_blocks = []
-        for _, tick, language, content in RE_CODE_BLOCK.finditer(message):
-            language = language.strip()
-            if tick == BACKTICK and language:
+        for match in RE_CODE_BLOCK.finditer(message):
+            # Used to ensure non-matched groups have an empty string as the default value.
+            groups = match.groupdict("")
+            language = groups["lang"].strip()  # Strip the newline cause it's included in the group.
+
+            if groups["tick"] == BACKTICK and language:
                 return ()
-            elif len(content.split("\n", 3)) > 3:
-                code_block = CodeBlock(content, language, tick)
+            elif len(groups["code"].split("\n", 3)) > 3:
+                code_block = CodeBlock(groups["code"], language, groups["tick"])
                 code_blocks.append(code_block)
+
+        return code_blocks
 
     @staticmethod
     def is_repl_code(content: str, threshold: int = 3) -> bool:
