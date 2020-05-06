@@ -210,11 +210,6 @@ class CodeFormatting(Cog):
         return False
 
     @staticmethod
-    def has_bad_ticks(message: discord.Message) -> bool:
-        """Return True if `message` starts with 3 characters which look like but aren't '`'."""
-        return message.content[:3] in TICKS
-
-    @staticmethod
     def is_help_channel(channel: discord.TextChannel) -> bool:
         """Return True if `channel` is in one of the help categories."""
         return (
@@ -327,7 +322,7 @@ class CodeFormatting(Cog):
 
     @Cog.listener()
     async def on_raw_message_edit(self, payload: RawMessageUpdateEvent) -> None:
-        """Check to see if an edited message (previously called out) still contains poorly formatted code."""
+        """Delete the instructions message if an edited message had its code blocks fixed."""
         if (
             # Checks to see if the message was called out by the bot
             payload.message_id not in self.codeblock_message_ids
@@ -338,19 +333,18 @@ class CodeFormatting(Cog):
         ):
             return
 
-        # Retrieve channel and message objects for use later
-        channel = self.bot.get_channel(int(payload.data.get("channel_id")))
-        user_message = await channel.fetch_message(payload.message_id)
+        # Parse the message to see if the code blocks have been fixed.
+        code_blocks = self.find_code_blocks(payload.data.get("content"))
 
-        #  Checks to see if the user has corrected their codeblock.  If it's fixed, has_fixed_codeblock will be None
-        has_fixed_codeblock = self.codeblock_stripping(payload.data.get("content"), self.has_bad_ticks(user_message))
+        # If the message is fixed, delete the bot message and the entry from the id dictionary.
+        if not code_blocks:
+            log.trace("User's incorrect code block has been fixed. Removing bot formatting message.")
 
-        # If the message is fixed, delete the bot message and the entry from the id dictionary
-        if has_fixed_codeblock is None:
+            channel = self.bot.get_channel(int(payload.data.get("channel_id")))
             bot_message = await channel.fetch_message(self.codeblock_message_ids[payload.message_id])
+
             await bot_message.delete()
             del self.codeblock_message_ids[payload.message_id]
-            log.trace("User's incorrect code block has been fixed. Removing bot formatting message.")
 
 
 def setup(bot: Bot) -> None:
