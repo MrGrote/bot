@@ -400,14 +400,17 @@ class CodeFormatting(Cog):
             return
 
         # Parse the message to see if the code blocks have been fixed.
-        code_blocks = self.find_code_blocks(payload.data.get("content"))
+        content = payload.data.get("content")
+        instructions = self.get_instructions(content)
+        bot_message = await self.get_sent_instructions(payload)
 
-        # If the message is fixed, delete the bot message and the entry from the id dictionary.
-        if not code_blocks:
+        if not instructions:
             log.trace("User's incorrect code block has been fixed. Removing instructions message.")
-            bot_message = await self.get_sent_instructions(payload)
             await bot_message.delete()
             del self.codeblock_message_ids[payload.message_id]
+        else:
+            log.trace("Message edited but still has invalid code blocks; editing the instructions.")
+            await bot_message.edit(content=instructions)
 
 
 def setup(bot: Bot) -> None:
