@@ -198,6 +198,36 @@ class CodeFormatting(Cog):
         else:
             log.trace("Aborting missing language instructions: content is not Python code.")
 
+    def get_instructions(self, content: str) -> Optional[str]:
+        """Return code block formatting instructions for `content` or None if nothing's wrong."""
+        log.trace("Getting formatting instructions.")
+
+        blocks = self.find_code_blocks(content)
+        if blocks is None:
+            log.trace("At least one valid code block found; no instructions to return.")
+            return
+
+        if not blocks:
+            log.trace(f"No code blocks were found in message.")
+            return self.get_no_ticks_message(content)
+        else:
+            log.trace("Searching results for a code block with invalid ticks.")
+            block = next((block for block in blocks if block.tick != BACKTICK), None)
+
+            if block:
+                log.trace(f"A code block exists but has invalid ticks.")
+                return self.get_bad_ticks_message(block)
+            else:
+                log.trace(f"A code block exists but is missing a language.")
+                block = blocks[0]
+
+                # Check for a bad language first to avoid parsing content into an AST.
+                description = self.get_bad_lang_message(block.content)
+                if not description:
+                    description = self.get_no_lang_message(block.content)
+
+                return description
+
     @staticmethod
     def find_code_blocks(message: str) -> Optional[Sequence[CodeBlock]]:
         """
@@ -355,32 +385,10 @@ class CodeFormatting(Cog):
             log.trace(f"Skipping code block detection of {msg.id}: #{msg.channel} is on cooldown.")
             return
 
-        blocks = self.find_code_blocks(msg.content)
-        if blocks is None:
-            # None is returned when there's at least one valid block with a language.
-            return
+        instructions = self.get_instructions(msg.content)
+        if instructions:
+            await self.send_guide_embed(msg, instructions)
 
-        if not blocks:
-            log.trace(f"No code blocks were found in message {msg.id}.")
-            description = self.get_no_ticks_message(msg.content)
-        else:
-            log.trace("Searching results for a code block with invalid ticks.")
-            block = next((block for block in blocks if block.tick != BACKTICK), None)
-
-            if block:
-                log.trace(f"A code block exists in {msg.id} but has invalid ticks.")
-                description = self.get_bad_ticks_message(block)
-            else:
-                log.trace(f"A code block exists in {msg.id} but is missing a language.")
-                block = blocks[0]
-
-                # Check for a bad language first to avoid parsing content into an AST.
-                description = self.get_bad_lang_message(block.content)
-                if not description:
-                    description = self.get_no_lang_message(block.content)
-
-        if description:
-            await self.send_guide_embed(msg, description)
             if msg.channel.id not in self.channel_whitelist:
                 log.trace(f"Adding #{msg.channel} to the channel cooldowns.")
                 self.channel_cooldowns[msg.channel.id] = time.time()
