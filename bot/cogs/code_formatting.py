@@ -199,15 +199,15 @@ class CodeFormatting(Cog):
             log.trace("Aborting missing language instructions: content is not Python code.")
 
     @staticmethod
-    def find_code_blocks(message: str) -> Sequence[CodeBlock]:
+    def find_code_blocks(message: str) -> Optional[Sequence[CodeBlock]]:
         """
         Find and return all Markdown code blocks in the `message`.
 
         Code blocks with 3 or less lines are excluded.
 
         If the `message` contains at least one code block with valid ticks and a specified language,
-        return an empty sequence. This is based on the assumption that if the user managed to get
-        one code block right, they already know how to fix the rest themselves.
+        return None. This is based on the assumption that if the user managed to get one code block
+        right, they already know how to fix the rest themselves.
         """
         log.trace("Finding all code blocks in a message.")
 
@@ -218,8 +218,8 @@ class CodeFormatting(Cog):
             language = groups["lang"].strip()  # Strip the newline cause it's included in the group.
 
             if groups["tick"] == BACKTICK and language:
-                log.trace("Message has a valid code block with a language; returning empty tuple.")
-                return ()
+                log.trace("Message has a valid code block with a language; returning None.")
+                return None
             elif len(groups["code"].split("\n", 3)) > 3:
                 code_block = CodeBlock(groups["code"], language, groups["tick"])
                 code_blocks.append(code_block)
@@ -341,6 +341,10 @@ class CodeFormatting(Cog):
             return
 
         blocks = self.find_code_blocks(msg.content)
+        if blocks is None:
+            # None is returned when there's at least one valid block with a language.
+            return
+
         if not blocks:
             log.trace(f"No code blocks were found in message {msg.id}.")
             description = self.get_no_ticks_message(msg.content)
